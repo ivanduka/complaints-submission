@@ -39,6 +39,11 @@ const base = airtable.base(AIRTABLE_BASE_ID);
 
 const app = express();
 
+const filesFolder = path.join(__dirname, "files");
+if (!fs.existsSync(filesFolder)) {
+  fs.mkdirSync(filesFolder);
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "files"),
   filename: (req, file, cb) => {
