@@ -11,6 +11,14 @@ const airtable = require("airtable");
 
 const { PORT, SENDGRID_API, AIRTABLE_VIEW_LINK, AIRTABLE_API_KEY, AIRTABLE_BASE_ID } = process.env;
 
+const transporter = nodemailer.createTransport(
+  sendgridTransport({
+    auth: {
+      api_key: SENDGRID_API,
+    },
+  }),
+);
+
 airtable.configure({ apiKey: AIRTABLE_API_KEY });
 const base = airtable.base(AIRTABLE_BASE_ID);
 
@@ -62,6 +70,13 @@ app.post("/", async (req, res, next) => {
       if (err) console.error(err);
     },
   );
+
+  transporter.sendMail({
+    to: email,
+    from: "no-reply@neb-one.gc.ca",
+    subject: "Your submission received!",
+    html: `<p>Your submission received on ${new Date().toLocaleDateString()}!</p>`,
+  });
 
   res.send("OK!");
 });
