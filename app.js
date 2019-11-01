@@ -26,36 +26,6 @@ const s3 = new AWS.S3({
   secretAccessKey: AWS_SECRET_ACCESS_KEY,
 });
 
-const uploadFile = fileName => {
-  const filePath = path.join(__dirname, "files", fileName);
-
-  // Read content from the file
-  const fileContent = fs.readFileSync(filePath);
-
-  // Setting up S3 upload parameters
-  const params = {
-    Bucket: AWS_BUCKET_NAME,
-    Key: fileName, // File name you want to save as in S3
-    Body: fileContent,
-  };
-
-  // Uploading files to the bucket
-  s3.upload(params, (err, data) => {
-    if (err) {
-      throw err;
-    }
-    console.log(`File uploaded successfully. ${data.Location}`);
-
-    fs.unlink(filePath, err => {
-      if (err) {
-        console.log(err);
-      } else {
-        console.log(`successfully deleted ${filePath}`);
-      }
-    });
-  });
-};
-
 const transporter = nodemailer.createTransport(
   sendgridTransport({
     auth: {
@@ -79,12 +49,6 @@ const storage = multer.diskStorage({
 
 const fileFilter = (req, file, cb) => cb(null, true);
 
-app.use(express.static("public"));
-
-app.use(bodyParser.urlencoded({ extended: false }));
-
-app.use(multer({ storage, fileFilter }).single("file"));
-
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET, POST, PUT, PATCH, DELETE");
@@ -92,40 +56,87 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(express.static("public"));
+
+app.use(bodyParser.urlencoded({ extended: false }));
+
+app.use(multer({ storage, fileFilter }).single("file"));
+
 app.post("/", async (req, res, next) => {
-  const { filename } = req.file;
-  const { name, surname, email, phone, postalCode, details, submitterType } = req.body;
+  try {
+    const { filename } = req.file;
+    const { name, surname, email, phone, postalCode, details, submitterType } = req.body;
 
-  base("Complaints").create(
-    [
-      {
-        fields: {
-          Name: name,
-          Surname: surname,
-          Attachment: AWS_BUCKET_URL + filename,
-          Complaint: details,
-          Email: email,
-          Phone: phone,
-          PostalCode: postalCode,
-          SubmitterType: submitterType,
+    base("Complaints").create(
+      [
+        {
+          fields: {
+            Name: name,
+            Surname: surname,
+            Attachment: AWS_BUCKET_URL + filename,
+            Complaint: details,
+            Email: email,
+            Phone: phone,
+            PostalCode: postalCode,
+            SubmitterType: submitterType,
+          },
         },
+      ],
+      (err, records) => {
+        if (err) {
+          console.error(err);
+          throw new Error("File is not uploaded!");
+        }
+
+        transporter
+          .sendMail({
+            to: email,
+            from: "no-reply@neb-one.gc.ca",
+            subject: "Your submission received!",
+            html: `<p>Your submission received on ${new Date().toLocaleDateString()}!</p>`,
+          })
+          .then(() => {
+            const fileName = filename;
+            const filePath = path.join(__dirname, "files", fileName);
+
+            // Read content from the file
+            const fileContent = fs.readFileSync(filePath);
+
+            // Setting up S3 upload parameters
+            const params = {
+              Bucket: AWS_BUCKET_NAME,
+              Key: fileName, // File name you want to save as in S3
+              Body: fileContent,
+            };
+
+            // Uploading files to the bucket
+            s3.upload(params, (err, data) => {
+              if (err) {
+                throw err;
+              }
+              console.log(`File uploaded successfully. ${data.Location}`);
+
+              fs.unlink(filePath, err => {
+                if (err) {
+                  console.log(err);
+                } else {
+                  console.log(`successfully deleted ${filePath}`);
+                  res.send(
+                    `<h1>Success!</h1><p><a href="${AIRTABLE_VIEW_LINK}" target="_blank">Please proceed to see the results</a></p>`,
+                  );
+                }
+              });
+            });
+          })
+          .catch(err => {
+            console.log(err);
+            throw new Error("Mail is not sent!");
+          });
       },
-    ],
-    (err, records) => {
-      if (err) console.error(err);
-    },
-  );
-
-  transporter.sendMail({
-    to: email,
-    from: "no-reply@neb-one.gc.ca",
-    subject: "Your submission received!",
-    html: `<p>Your submission received on ${new Date().toLocaleDateString()}!</p>`,
-  });
-
-  uploadFile(filename);
-
-  res.send("<h1>Success!</h1>");
+    );
+  } catch (error) {
+    res.send("Please enter all fields, including the file");
+  }
 });
 
 // eslint-disable-next-line no-unused-vars
