@@ -5,11 +5,56 @@ const multer = require("multer");
 const nodemailer = require("nodemailer");
 const sendgridTransport = require("nodemailer-sendgrid-transport");
 const AWS = require("aws-sdk");
-const twilio = require("twilio");
+const fs = require("fs");
 require("dotenv").config();
 const airtable = require("airtable");
 
-const { PORT, SENDGRID_API, AIRTABLE_VIEW_LINK, AIRTABLE_API_KEY, AIRTABLE_BASE_ID } = process.env;
+const {
+  PORT,
+  SENDGRID_API,
+  AIRTABLE_VIEW_LINK,
+  AIRTABLE_API_KEY,
+  AIRTABLE_BASE_ID,
+  AWS_ACCESS_KEY,
+  AWS_SECRET_ACCESS_KEY,
+  AWS_BUCKET_NAME,
+  AWS_BUCKET_URL,
+} = process.env;
+
+const s3 = new AWS.S3({
+  accessKeyId: AWS_ACCESS_KEY,
+  secretAccessKey: AWS_SECRET_ACCESS_KEY,
+});
+
+const uploadFile = fileName => {
+  const filePath = path.join(__dirname, "files", fileName);
+
+  // Read content from the file
+  const fileContent = fs.readFileSync(filePath);
+
+  // Setting up S3 upload parameters
+  const params = {
+    Bucket: AWS_BUCKET_NAME,
+    Key: fileName, // File name you want to save as in S3
+    Body: fileContent,
+  };
+
+  // Uploading files to the bucket
+  s3.upload(params, (err, data) => {
+    if (err) {
+      throw err;
+    }
+    console.log(`File uploaded successfully. ${data.Location}`);
+
+    fs.unlink(filePath, err => {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log(`successfully deleted ${filePath}`);
+      }
+    });
+  });
+};
 
 const transporter = nodemailer.createTransport(
   sendgridTransport({
@@ -57,7 +102,7 @@ app.post("/", async (req, res, next) => {
         fields: {
           Name: name,
           Surname: surname,
-          Attachment: filename,
+          Attachment: AWS_BUCKET_URL + filename,
           Complaint: details,
           Email: email,
           Phone: phone,
@@ -78,7 +123,9 @@ app.post("/", async (req, res, next) => {
     html: `<p>Your submission received on ${new Date().toLocaleDateString()}!</p>`,
   });
 
-  res.send("OK!");
+  uploadFile(filename);
+
+  res.send("<h1>Success!</h1>");
 });
 
 // eslint-disable-next-line no-unused-vars
