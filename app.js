@@ -7,8 +7,12 @@ const sendgridTransport = require("nodemailer-sendgrid-transport");
 const AWS = require("aws-sdk");
 const twilio = require("twilio");
 require("dotenv").config();
+const airtable = require("airtable");
 
-const { PORT, SENDGRID_API, AIRTABLE_API } = process.env;
+const { PORT, SENDGRID_API, AIRTABLE_VIEW_LINK, AIRTABLE_API_KEY, AIRTABLE_BASE_ID } = process.env;
+
+airtable.configure({ apiKey: AIRTABLE_API_KEY });
+const base = airtable.base(AIRTABLE_BASE_ID);
 
 const app = express();
 
@@ -21,11 +25,6 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => cb(null, true);
-
-// app.use((req, res, next) => {
-//   console.log(req._parsedUrl.path);
-//   next();
-// });
 
 app.use(express.static("public"));
 
@@ -41,8 +40,29 @@ app.use((req, res, next) => {
 });
 
 app.post("/", async (req, res, next) => {
-  req.body.filename = req.file.filename;
-  console.log(req.body);
+  const { filename } = req.file;
+  const { name, surname, email, phone, postalCode, details, submitterType } = req.body;
+
+  base("Complaints").create(
+    [
+      {
+        fields: {
+          Name: name,
+          Surname: surname,
+          Attachment: filename,
+          Complaint: details,
+          Email: email,
+          Phone: phone,
+          PostalCode: postalCode,
+          SubmitterType: submitterType,
+        },
+      },
+    ],
+    (err, records) => {
+      if (err) console.error(err);
+    },
+  );
+
   res.send("OK!");
 });
 
