@@ -12,27 +12,38 @@ const { PORT, SENDGRID_API, AIRTABLE_API } = process.env;
 
 const app = express();
 
-const fileStorage = multer.diskStorage({
+const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "files"),
-  filename: (req, file, cb) => cb(null, file.originalname),
+  filename: (req, file, cb) => {
+    const dateTime = new Date().toISOString().replace(/:/gi, "-");
+    cb(null, `${dateTime} ${file.originalname}`);
+  },
 });
 
-app.use((req, res, next) => {
-  console.log(req._parsedUrl.path);
-  next();
-});
+const fileFilter = (req, file, cb) => cb(null, true);
+
+// app.use((req, res, next) => {
+//   console.log(req._parsedUrl.path);
+//   next();
+// });
 
 app.use(express.static("public"));
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
-app.use(multer({ storage: fileStorage }).single("file"));
+app.use(multer({ storage, fileFilter }).single("file"));
 
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET, POST, PUT, PATCH, DELETE");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   next();
+});
+
+app.post("/", async (req, res, next) => {
+  req.body.filename = req.file.filename;
+  console.log(req.body);
+  res.send("OK!");
 });
 
 // eslint-disable-next-line no-unused-vars
