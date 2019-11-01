@@ -127,7 +127,7 @@ app.post("/", async (req, res, next) => {
                 } else {
                   console.log(`successfully deleted ${filePath}`);
                   res.send(
-                    `<h1>Success!</h1><p><a href="${AIRTABLE_VIEW_LINK}" target="_blank">Please proceed to see the results</a></p>`,
+                    `<h1>Complaint successfully received.</h1><p><a href="${AIRTABLE_VIEW_LINK}" target="_blank">Please proceed to see the results</a></p>`,
                   );
                 }
               });
