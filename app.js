@@ -98,7 +98,7 @@ app.post("/", async (req, res, next) => {
             to: email,
             from: "no-reply@neb-one.gc.ca",
             subject: "Your submission received!",
-            html: `<p>Your submission received on ${new Date().toLocaleDateString()}!</p>`,
+            html: `<p>Your submission was received on ${new Date().toLocaleDateString()}!</p>`,
           })
           .then(() => {
             const fileName = filename;
